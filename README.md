@@ -331,3 +331,56 @@ Outputs are written to:
 ```text
 outputs/DINOV2_<date>_<run_id>/
 ```
+## Selecting the “best” clustering run (grid search, using the "--mode grid" parameter)
+
+The grid search outputs one row per parameter combination in `outputs/grid_search_<date>.csv`.
+We select a final run using the following decision logic.
+
+### 1) Feasibility filters (exclude degenerate solutions)
+
+Discard runs that fail any of these checks:
+
+- **Degenerate typology**: `n_clusters < 3`
+- **Excessive noise** (default threshold; adjust to project goals): `noise_fraction > 0.60`
+- **Dominant single cluster** (default threshold): `largest_cluster_share > 0.50`
+- **Missing validity metrics**: `dbcv_filtered` is `NA` (and optionally `silhouette_filtered` is `NA`)
+
+These filters remove parameter settings that do not produce a usable cluster structure.
+
+### 2) Primary ranking criterion (density validity)
+
+Among remaining runs, rank by:
+
+1. **DBCV** (`dbcv_filtered`) — descending
+
+DBCV is prioritised because the clustering method is density-based (HDBSCAN).
+
+### 3) Secondary ranking criterion (separation robustness)
+
+Use as tie-breakers (in order):
+
+2. **Silhouette** (`silhouette_filtered`) — descending  
+3. **Noise fraction** (`noise_fraction`) — ascending
+
+Silhouette provides a complementary separation check (computed on the filtered, non-noise set if configured).
+
+### 4) Structural sanity checks (typology usefulness)
+
+Prefer runs that satisfy:
+
+- **Balanced cluster sizes**: higher `cluster_entropy`
+- **No single cluster dominates**: lower `largest_cluster_share`
+- **Pragmatic number of clusters**: `n_clusters` within an analytically useful range  
+  (project-dependent; e.g., 15–80 for typology work)
+
+If two runs have similar DBCV/silhouette, choose the one with lower noise and more balanced cluster sizes.
+
+### 5) Final selection via manual validation
+
+Select the top ~3–5 runs after ranking and inspect:
+
+- `viz_scatter.html` (global separation, noise patterns)
+- `montages/` (intra-cluster coherence; inter-cluster differentiation)
+
+The final choice is the best trade-off between:
+validity metrics (DBCV/silhouette), noise level, cluster balance, and substantive interpretability.
