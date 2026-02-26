@@ -17,20 +17,16 @@
 
   "embedding": {
     "method": "dinov2",
-
     "dinov2": {
       "model_id": "facebook/dinov2-base"
     },
-
     "batch_size": 32,
     "num_workers": 0,
-
     "store": {
       "format": "npy",
       "dtype": "float32",
       "l2_normalize": true
     },
-
     "preprocess": {
       "policy": "center_crop",
       "input_size": 224
@@ -72,7 +68,6 @@
   },
 
   "grid_search": {
-    "enabled": true,
     "umap": {
       "n_neighbors": [15, 30, 50],
       "min_dist": [0.0, 0.1]
@@ -81,6 +76,11 @@
       "min_cluster_size": [10, 20, 30],
       "min_samples": [5, 10]
     }
+  },
+
+  "stability": {
+    "seeds": [1, 2, 3, 4, 5],
+    "exclude_noise_for_ari": true
   },
 
   "export": {

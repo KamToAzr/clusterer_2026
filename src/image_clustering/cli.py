@@ -27,7 +27,11 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--mode", default="run", choices=["run", "grid"])
+    parser.add_argument(
+        "--mode",
+        default="run",
+        choices=["run", "grid", "stability"]
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -37,9 +41,15 @@ def main():
     output_root.mkdir(parents=True, exist_ok=True)
     cache_root.mkdir(parents=True, exist_ok=True)
 
+    # ------------------------
+    # Manifest
+    # ------------------------
     manifest = build_manifest(cfg)
     manifest_hash = stable_hash_str("|".join(manifest["image_id"].tolist()), 10)
 
+    # ------------------------
+    # Embedding cache key
+    # ------------------------
     emb_cfg = {
         "method": cfg["embedding"]["method"],
         "preprocess": cfg["embedding"]["preprocess"],
@@ -48,7 +58,8 @@ def main():
     }
 
     embed_id = stable_hash_dict(
-        {"manifest": manifest_hash, "embedding": emb_cfg}, 16
+        {"manifest": manifest_hash, "embedding": emb_cfg},
+        16,
     )
 
     emb_cache_dir = cache_root / "embeddings" / embed_id
@@ -67,15 +78,27 @@ def main():
         meta.to_csv(meta_path, index=False)
         print(f"Saved embeddings: {X.shape}")
 
-    # ---------- GRID MODE ----------
+    # ------------------------
+    # GRID MODE
+    # ------------------------
     if args.mode == "grid":
         from image_clustering.analysis.grid_search import run_grid_search
         run_grid_search(cfg, X, meta, output_root)
         return
 
-    # ---------- NORMAL RUN ----------
+    # ------------------------
+    # STABILITY MODE
+    # ------------------------
+    if args.mode == "stability":
+        from image_clustering.analysis.stability import run_stability
+        run_stability(cfg, X, meta, output_root, embed_id=embed_id)
+        return
 
-    clustering_space = cfg["clustering"]["space"]
+    # ------------------------
+    # NORMAL RUN
+    # ------------------------
+
+    clustering_space = cfg["clustering"]["space"].lower()
 
     coords = run_umap(cfg, X, meta)
 
@@ -90,28 +113,45 @@ def main():
     assignments["cluster_label"] = labels
     assignments["probability"] = probs
 
-    metrics = evaluate(cfg, labels_full=labels, data_for_metrics=cluster_data)
+    metrics = evaluate(
+        cfg,
+        labels_full=labels,
+        data_for_metrics=cluster_data,
+    )
 
     date_stamp = cfg["export"]["date_stamp"]
-    run_id = stable_hash_dict({"embed": embed_id, "params": cfg["hdbscan"]}, 20)
+    run_id = stable_hash_dict(
+        {"embed": embed_id, "params": cfg["hdbscan"], "umap": cfg["umap"]},
+        20,
+    )
+
     out_dir = output_root / f"DINOV2_{date_stamp}_{run_id}"
     out_dir.mkdir(exist_ok=True)
 
     assignments.to_csv(out_dir / "assignments.csv", index=False)
     coords.to_csv(out_dir / "umap_coords.csv", index=False)
-    (out_dir / "run_metrics.json").write_text(json.dumps(metrics, indent=2))
     meta.to_csv(out_dir / "embeddings_meta.csv", index=False)
+    (out_dir / "run_metrics.json").write_text(
+        json.dumps(metrics, indent=2)
+    )
 
-    render_bokeh(cfg, assignments, out_dir / "viz_scatter.html", metrics=metrics)
+    render_bokeh(
+        cfg,
+        assignments,
+        out_dir / "viz_scatter.html",
+        metrics=metrics,
+    )
 
     assignments_for_montage = assignments.merge(
         meta[["image_id", "abspath"]],
         on="image_id",
-        how="left"
+        how="left",
     )
+
     build_montages(cfg, assignments_for_montage, out_dir)
 
-    print(f"Done. Outputs in: {out_dir}")
+    print(f"\nDone. Outputs in: {out_dir}")
+    print(f"Embeddings cache: {emb_cache_dir}")
 
 
 if __name__ == "__main__":

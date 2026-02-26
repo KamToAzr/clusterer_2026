@@ -384,3 +384,197 @@ Select the top ~3–5 runs after ranking and inspect:
 
 The final choice is the best trade-off between:
 validity metrics (DBCV/silhouette), noise level, cluster balance, and substantive interpretability.
+
+# Execution Modes
+
+The pipeline supports three execution modes:
+
+-   `--mode run`
+-   `--mode grid`
+-   `--mode stability`
+
+Each mode serves a distinct methodological purpose.
+
+------------------------------------------------------------------------
+
+## 1) `--mode run` --- Standard Clustering
+
+This is the default analysis mode.
+
+### What it does
+
+1.  Loads (or computes) embeddings.
+2.  Runs UMAP (for visualisation and optionally clustering).
+3.  Runs HDBSCAN in the space defined by:
+
+``` json
+"clustering": { "space": "umap" }
+```
+
+or
+
+``` json
+"clustering": { "space": "embedding" }
+```
+
+4.  Computes evaluation metrics:
+    -   `silhouette_filtered`
+    -   `dbcv_filtered`
+    -   `noise_fraction`
+    -   `n_clusters`
+    -   `largest_cluster_share`
+    -   `cluster_entropy`
+5.  Writes:
+    -   `assignments.csv`
+    -   `umap_coords.csv`
+    -   `run_metrics.json`
+    -   `viz_scatter.html`
+    -   cluster montages
+
+### Purpose
+
+Use this mode once optimal parameters have been selected.
+
+------------------------------------------------------------------------
+
+## 2) `--mode grid` --- Systematic Parameter Search
+
+This mode evaluates multiple UMAP and HDBSCAN parameter combinations.
+
+### What it does
+
+-   Reuses cached embeddings.
+-   Iterates over parameter ranges defined in:
+
+``` json
+"grid_search": {
+  "umap": {
+    "n_neighbors": [...],
+    "min_dist": [...]
+  },
+  "hdbscan": {
+    "min_cluster_size": [...],
+    "min_samples": [...]
+  }
+}
+```
+
+-   Uses the clustering space defined in:
+
+``` json
+"clustering": { "space": "umap" | "embedding" }
+```
+
+-   Computes evaluation metrics for each combination.
+-   Writes a single ranked file:
+
+```{=html}
+<!-- -->
+```
+    outputs/grid_search_<date>.csv
+
+No visualisations or montages are produced.
+
+------------------------------------------------------------------------
+
+### Ranking Logic
+
+Each parameter combination receives a ranking score:
+
+rank_score = 0.5 \* DBCV + 0.3 \* Silhouette - 0.2 \* Noise Fraction
+
+#### Interpretation of weights
+
+-   **DBCV (0.5)**\
+    Primary criterion.\
+    Clustering is density-based (HDBSCAN), so DBCV is weighted highest.
+
+-   **Silhouette (0.3)**\
+    Secondary separation metric.\
+    Helps avoid selecting solutions that are dense but poorly separated.
+
+-   **Noise Fraction (-0.2)**\
+    Penalises solutions that discard too many points as noise.
+
+Missing values are handled conservatively: - Missing DBCV or silhouette
+→ treated as `0` - Missing noise fraction → treated as `1` (worst-case
+penalty)
+
+The CSV is automatically sorted by: 1. `rank_score` (descending) 2.
+`dbcv_filtered` (descending) 3. `silhouette_filtered` (descending) 4.
+`noise_fraction` (ascending)
+
+------------------------------------------------------------------------
+
+### Recommended Selection Workflow
+
+1.  Exclude degenerate runs:
+
+    -   `n_clusters < 3`
+    -   `noise_fraction > 0.6`
+    -   `largest_cluster_share > 0.5`
+
+2.  Inspect top-ranked runs.
+
+3.  Validate the best 3--5 candidates using `--mode run`.
+
+------------------------------------------------------------------------
+
+## 3) `--mode stability` --- Cluster Robustness Analysis
+
+This mode evaluates clustering stability across random seeds.
+
+### What it does
+
+-   Re-runs the selected configuration using different seeds:
+
+``` json
+"stability": {
+  "seeds": [1, 2, 3, 4, 5],
+  "exclude_noise_for_ari": true
+}
+```
+
+-   Computes pairwise Adjusted Rand Index (ARI).
+-   Writes:
+
+```{=html}
+<!-- -->
+```
+    outputs/stability_<date>_<embed_id>/
+        ari_matrix.csv
+        stability_summary.json
+
+------------------------------------------------------------------------
+
+### Interpretation of ARI
+
+  Mean ARI     Interpretation
+  ------------ -------------------
+  \> 0.90      Extremely stable
+  0.75--0.90   Very stable
+  0.60--0.75   Moderately stable
+  0.40--0.60   Weak stability
+  \< 0.40      Unstable
+
+For research-grade robustness, aim for:
+
+Mean ARI ≥ 0.75
+
+------------------------------------------------------------------------
+
+### Important Notes
+
+-   Stability analysis is meaningful when clustering in UMAP space.
+-   If clustering is performed in embedding space, ARI will typically be
+    ≈1.0 because embeddings are deterministic.
+
+------------------------------------------------------------------------
+
+# Summary of Modes
+
+  Mode          Purpose                            Produces
+  ------------- ---------------------------------- ----------------------
+  `run`         Final clustering + visualisation   Full output folder
+  `grid`        Parameter optimisation             Ranked CSV
+  `stability`   Robustness check (ARI)             ARI matrix + summary
