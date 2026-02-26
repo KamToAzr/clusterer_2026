@@ -67,6 +67,16 @@
     }
   },
 
+  "export_clusters": {
+    "enabled": true,
+    "mode": "hardlink",
+    "include_noise": true,
+    "folder_prefix": "cluster_",
+    "noise_folder": "noise",
+    "zero_pad": 4,
+    "overwrite": false
+  },
+
   "grid_search": {
     "umap": {
       "n_neighbors": [15, 30, 50],

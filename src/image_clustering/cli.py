@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -16,6 +15,7 @@ from image_clustering.cluster.evaluate import evaluate
 from image_clustering.utils.hashing import stable_hash_dict, stable_hash_str
 from image_clustering.viz.bokeh_scatter import render_bokeh
 from image_clustering.viz.montage import build_montages
+from image_clustering.io.cluster_folders import export_cluster_folders
 
 
 def load_config(path: str) -> dict:
@@ -105,6 +105,7 @@ def main():
     if clustering_space == "embedding":
         cluster_data = X
     else:
+        # If you later support n_components=3, update to use ["u1","u2","u3"] when needed.
         cluster_data = coords[["u1", "u2"]].to_numpy()
 
     labels, probs, _ = run_hdbscan(cfg, cluster_data)
@@ -128,13 +129,42 @@ def main():
     out_dir = output_root / f"DINOV2_{date_stamp}_{run_id}"
     out_dir.mkdir(exist_ok=True)
 
+    # Save core outputs
     assignments.to_csv(out_dir / "assignments.csv", index=False)
     coords.to_csv(out_dir / "umap_coords.csv", index=False)
     meta.to_csv(out_dir / "embeddings_meta.csv", index=False)
+
     (out_dir / "run_metrics.json").write_text(
-        json.dumps(metrics, indent=2)
+        json.dumps(metrics, indent=2),
+        encoding="utf-8"
     )
 
+    # Merge absolute paths for montage + per-cluster folders
+    assignments_for_export = assignments.merge(
+        meta[["image_id", "abspath"]],
+        on="image_id",
+        how="left",
+    )
+
+    # ------------------------
+    # Cluster summary (explicit cluster sizes)
+    # ------------------------
+    cluster_summary = (
+        assignments_for_export
+        .groupby("cluster_label", dropna=False)
+        .agg(
+            n_images=("image_id", "count"),
+            mean_probability=("probability", "mean"),
+        )
+        .reset_index()
+    )
+    cluster_summary["share"] = cluster_summary["n_images"] / len(assignments_for_export)
+    cluster_summary = cluster_summary.sort_values("n_images", ascending=False)
+    cluster_summary.to_csv(out_dir / "cluster_summary.csv", index=False)
+
+    # ------------------------
+    # Visualisation
+    # ------------------------
     render_bokeh(
         cfg,
         assignments,
@@ -142,13 +172,11 @@ def main():
         metrics=metrics,
     )
 
-    assignments_for_montage = assignments.merge(
-        meta[["image_id", "abspath"]],
-        on="image_id",
-        how="left",
-    )
-
-    build_montages(cfg, assignments_for_montage, out_dir)
+    # ------------------------
+    # Montage + cluster folders
+    # ------------------------
+    build_montages(cfg, assignments_for_export, out_dir)
+    export_cluster_folders(cfg, assignments_for_export, out_dir)
 
     print(f"\nDone. Outputs in: {out_dir}")
     print(f"Embeddings cache: {emb_cache_dir}")

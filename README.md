@@ -578,3 +578,134 @@ Mean ARI ≥ 0.75
   `run`         Final clustering + visualisation   Full output folder
   `grid`        Parameter optimisation             Ranked CSV
   `stability`   Robustness check (ARI)             ARI matrix + summary
+
+
+# Output files
+
+---
+
+## 1. `assignments.csv`
+
+**Unit of analysis:** individual image  
+
+Contains the clustering result per image.
+
+**Columns**
+
+- `image_id` – internal identifier (derived from file name)
+- `u1`, `u2` – UMAP coordinates (if clustering space = "umap")
+- `cluster_label` – integer cluster ID (`-1` = noise)
+- `probability` – HDBSCAN membership strength (0–1)
+
+**Purpose**
+
+- Primary clustering output
+- Basis for sub-clustering
+- Image-level analysis
+- Merge with external annotations
+
+---
+
+## 2. `cluster_summary.csv`
+
+**Unit of analysis:** cluster  
+
+Aggregated statistics per cluster.
+
+**Columns**
+
+- `cluster_label` – cluster ID (`-1` = noise)
+- `n_images` – number of images in cluster
+- `mean_probability` – average membership confidence
+- `share` – proportion of dataset in cluster
+
+**Purpose**
+
+- Quick overview of cluster sizes
+- Identify dominant or very small clusters
+- Assess noise proportion
+- Support reporting and documentation
+
+---
+
+## 3. `embeddings_meta.csv`
+
+Metadata linked to embeddings.
+
+**Columns**
+
+- `image_id`
+- `abspath` – absolute path to original image file
+- (optional additional ingestion metadata)
+
+**Purpose**
+
+- Traceability
+- Reconstruct image-to-cluster mapping
+- Required for montage and cluster folder export
+
+---
+
+## 4. `run_metrics.json`
+
+Global evaluation metrics for the run.
+
+**Typical fields**
+
+- `n_total`
+- `n_clustered`
+- `n_noise`
+- `noise_fraction`
+- `silhouette_filtered`
+- `dbcv_filtered`
+- (additional density metrics)
+
+**Purpose**
+
+- Evaluate clustering quality
+- Compare parameter settings
+- Store reproducible run metadata
+
+---
+
+## 5. `umap_coords.csv`
+
+UMAP embedding coordinates for all images.
+
+**Columns**
+
+- `image_id`
+- `u1`, `u2` (or more if `n_components > 2`)
+
+**Purpose**
+
+- Reproduce visualization
+- External plotting
+- Downstream clustering if needed
+
+---
+
+## 6. `viz_scatter.html`
+
+Interactive Bokeh visualization.
+
+**Features**
+
+- Scatter plot of UMAP embedding
+- Cluster colouring
+- Optional noise toggle
+- Centroid labels
+- Run metrics displayed below plot
+
+**Purpose**
+
+- Visual validation of cluster structure
+- Manual qualitative inspection
+- Presentation and exploratory analysis
+
+---
+
+## Optional: `clusters/` directory
+
+If enabled in config:
+
