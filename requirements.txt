@@ -1,0 +1,12 @@
+torch
+torchvision
+transformers>=4.56.0
+numpy
+pandas
+pillow
+tqdm
+umap-learn
+hdbscan
+scikit-learn
+bokeh
+streamlit

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from image_clustering.io.manifest import build_manifest
-from image_clustering.embeddings.dinov2 import compute_dinov2_embeddings
+from image_clustering.embeddings.dinov3 import compute_embeddings
 from image_clustering.reduce.umap_reduce import run_umap
 from image_clustering.cluster.hdbscan_cluster import run_hdbscan
 from image_clustering.cluster.evaluate import evaluate
@@ -73,7 +73,7 @@ def main():
         meta = pd.read_csv(meta_path)
         print(f"Loaded cached embeddings: {X.shape}")
     else:
-        X, meta = compute_dinov2_embeddings(cfg, manifest)
+        X, meta = compute_embeddings(cfg, manifest)
         np.save(emb_path, X)
         meta.to_csv(meta_path, index=False)
         print(f"Saved embeddings: {X.shape}")
