@@ -1,4 +1,4 @@
-# Image Clustering Pipeline (DINOv2 + UMAP + HDBSCAN)
+# Image Clustering Pipeline (DINOv3 + UMAP + HDBSCAN)
 
 ## Overview
 
@@ -7,7 +7,7 @@ This project implements a reproducible, configuration-driven image clustering pi
 Pipeline stages:
 
 1. Deterministic image ingestion (manifest creation)
-2. Feature extraction using DINOv2 embeddings
+2. Feature extraction using DINOv3 embeddings
 3. Optional dimensionality reduction with UMAP
 4. Density-based clustering using HDBSCAN
 5. Evaluation (Silhouette, DBCV)
@@ -29,7 +29,7 @@ clusterer_2026/
 ├── cache/
 │   └── embeddings/
 ├── outputs/
-│   ├── DINOV2_<date>_<run_id>/
+│   ├── DINOV3_<date>_<run_id>/
 │   └── run_log.csv
 ├── src/
 │   └── image_clustering/
@@ -37,7 +37,7 @@ clusterer_2026/
 │       ├── io/
 │       │   └── manifest.py
 │       ├── embeddings/
-│       │   └── dinov2.py
+│       │   └── dinov3.py
 │       ├── reduce/
 │       │   └── umap_reduce.py
 │       ├── cluster/
@@ -69,13 +69,13 @@ This ensures reproducibility across runs.
 
 ---
 
-### 2) Embeddings (DINOv2)
+### 2) Embeddings (DINOv3)
 
-Images are converted into feature vectors using a Hugging Face DINOv2 checkpoint (default: `facebook/dinov2-base`).
+Images are converted into feature vectors using a Hugging Face DINOv3 checkpoint (default: `facebook/dinov3-base`).
 
 Output:
 
-- Embedding matrix `X` with shape `(N, D)` (e.g., `D = 768` for `dinov2-base`)
+- Embedding matrix `X` with shape `(N, D)` (e.g., `D = 768` for `dinov3-base`)
 
 Embeddings are cached in:
 
@@ -86,7 +86,7 @@ cache/embeddings/<embed_id>/
 Embeddings are recomputed only if:
 
 - Images change
-- `dinov2.model_id` changes
+- `dinov3.model_id` changes
 - Preprocessing changes (e.g., crop/size)
 - Normalisation settings change
 
@@ -218,8 +218,8 @@ Stored fields typically include:
 
 | Key | Meaning |
 |---|---|
-| `method` | Embedding backend (currently `"dinov2"`) |
-| `dinov2.model_id` | Hugging Face DINOv2 checkpoint id |
+| `method` | Embedding backend (currently `"dinov3"`) |
+| `dinov3.model_id` | Hugging Face DINOv3 checkpoint id |
 | `batch_size` | Batch size for embedding inference |
 | `preprocess.input_size` | Resize + center crop size |
 | `store.l2_normalize` | Whether to L2-normalise embeddings |
@@ -329,7 +329,7 @@ python -m image_clustering.cli --config config/config.json
 Outputs are written to:
 
 ```text
-outputs/DINOV2_<date>_<run_id>/
+outputs/DINOv3_<date>_<run_id>/
 ```
 ## Selecting the “best” clustering run (grid search, using the "--mode grid" parameter)
 
